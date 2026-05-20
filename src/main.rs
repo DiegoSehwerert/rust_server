@@ -1,25 +1,32 @@
 use axum::Router;
-use std::net::SocketAddr;
+use std::env;
+use std::sync::Arc;
+use v1::auth::handlers::AppState; // Importamos tu estructura de estado de siempre
 
-// Importamos la carpeta v1
 mod v1;
 
 #[tokio::main]
 async fn main() {
-    // 1. Construimos el Rúter Principal e inyectamos las rutas de la V1
-    // Todas las rutas de v1 colgarán automáticamente de /api/v1
-    let app = Router::new()
-        .nest("/api/v1", v1::routes());
+    // 1. Cargamos el archivo .env
+    dotenvy::dotenv().expect("❌ No se pudo cargar el archivo .env");
 
-    // 2. Definimos la dirección IP y el puerto (localhost:3000)
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3002));
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    
-    println!("🔥 Servidor arrancado en http://{}", addr);
-    println!("Pistas de endpoints disponibles:");
-    println!("  -> http://{}/api/v1/status/ping", addr);
-    println!("  -> http://{}/api/v1/status/version", addr);
+    // 2. Creamos el AppState SÓLO con lo necesario para GitHub y HTTP
+    let state = Arc::new(AppState {
+        github_client_id: env::var("GITHUB_CLIENT_ID").expect("Falta GITHUB_CLIENT_ID"),
+        github_client_secret: env::var("GITHUB_CLIENT_SECRET").expect("Falta GITHUB_CLIENT_SECRET"),
+        http_client: reqwest::Client::new(),
+    });
 
-    // 3. Encendemos el servidor
+    // 3. Leemos el puerto
+    let puerto = env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    let direccion = format!("127.0.0.1:{}", puerto);
+
+    // 4. Pasamos el estado de GitHub simplificado a las rutas
+    let app = Router::new().nest("/api/v1", v1::routes(Arc::clone(&state)));
+
+    // 5. Encendemos el servidor
+    let listener = tokio::net::TcpListener::bind(&direccion).await.unwrap();
+    println!("🚀 Servidor simplificado corriendo en http://{}", direccion);
+
     axum::serve(listener, app).await.unwrap();
 }

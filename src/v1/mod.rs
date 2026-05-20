@@ -1,11 +1,17 @@
+use crate::v1::auth::handlers::AppState;
 use axum::Router;
+use std::sync::Arc;
 
-// 1. Declaramos el archivo status.rs como sub-módulo
-mod status;
+// 1. 🔥 ¡OJO AQUÍ! Añadimos 'pub' delante de ambos módulos
+// Esto le dice a Rust: "Cualquiera que entre a V1 puede ver que existen estas subcarpetas"
+pub mod auth;
+pub mod users;
 
-// 2. Agrupamos todos los rúters de la versión 1
-pub fn routes() -> Router {
-    Router::new().nest("/status", status::router())
-    // Cuando crees 'users', solo tendrás que añadir otra línea aquí:
-    // .nest("/users", users::router())
+/// Reúne todas las rutas de la versión 1 de la API.
+pub fn routes(state: Arc<AppState>) -> Router {
+    Router::new()
+        // Conectamos las rutas de autenticación pasándole el estado clonado
+        .nest("/auth", auth::router(Arc::clone(&state)))
+        // Conectamos las rutas de usuarios
+        .nest("/users", users::router(Arc::clone(&state)))
 }
